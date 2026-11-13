@@ -111,6 +111,10 @@ function inExitPath( g ) {
   return inPen( g ) || ( y === 12 && ( x === 13 || x === 14 ) );
 }
 
+function isExiting( g ) {
+  return inExitPath( g );
+}
+
 function manhattan( ax, ay, bx, by ) {
   return Math.abs( ax - bx ) + Math.abs( ay - by );
 }
@@ -149,7 +153,7 @@ function chaseTarget( game, g ) {
 }
 
 function ghostTarget( game, g ) {
-  if ( inExitPath( g ) ) return PEN_EXIT;
+  if ( isExiting( g ) ) return PEN_EXIT;
   const px = Math.round( game.pacman.x );
   const py = Math.round( game.pacman.y );
   const fallback = { x: px, y: py };
@@ -194,12 +198,19 @@ function decideGhost( game, g ) {
   const px = Math.round( game.pacman.x );
   const py = Math.round( game.pacman.y );
   const target = ghostTarget( game, g ) || { x: px, y: py };
+  const exiting = isExiting( g );
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
   );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+
+  // En celdas de puerta, prioriza subir para cruzar al mapa sin bucles.
+  if ( exiting && Math.round( g.y ) === 12 && choices.includes( 'up' ) ) {
+    g.dir = 'up';
+    return;
+  }
 
   let best = choices[ 0 ];
   let bestDist = Infinity;
@@ -213,6 +224,23 @@ function decideGhost( game, g ) {
       best = dir;
     }
   }
+
+  // Durante la salida, ante empate de distancia prefiere avanzar hacia arriba/centro.
+  if ( exiting ) {
+    const pref = [ 'up', 'left', 'right', 'down' ];
+    for ( const dir of pref ) {
+      if ( !choices.includes( dir ) ) continue;
+      const d = DIRS[ dir ];
+      const nx = g.x + d.x;
+      const ny = g.y + d.y;
+      const dist = manhattan( nx, ny, target.x, target.y );
+      if ( dist === bestDist ) {
+        best = dir;
+        break;
+      }
+    }
+  }
+
   g.dir = best;
 }
 
@@ -225,6 +253,8 @@ function moveGhost( game, g ) {
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
+    // Normaliza estado en celdas alineadas durante la salida.
+    if ( isExiting( g ) && !DIRS[ g.dir ] ) g.dir = 'up';
     decideGhost( game, g );
     if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
   }
