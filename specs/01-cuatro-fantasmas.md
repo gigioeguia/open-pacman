@@ -124,6 +124,8 @@ Convenciones:
 | El greedy sin invertir podría atascar la salida del corral | El interior del corral es un rectángulo abierto y el objetivo dentro de él es fijo (`PEN_EXIT`); el giro de 180º en callejón ya existe. |
 | 4 cazadores activos pueden hacer el juego muy difícil | El ciclo scatter da respiros periódicos y solo blinky fija la casilla de Pac-Man. |
 | `requestAnimationFrame` no siempre corre a 60 fps | Todo el juego ya mide en frames (`PACMAN_SPEED`); la exactitud por delta-time, si se desea, es otra spec. |
+| Caché desalineada entre scripts (`game.js` nuevo con `maze.js` antiguo) puede dejar `kind`/objetivo indefinido y congelar el juego (p. ej. `target` undefined en `decideGhost`) | Versionado/caché-busting conjunto de scripts dependientes en `src/index.html` (`?v=2`) y defensas en `src/js/game.js`: `releaseAt` por defecto, `ghostTarget` siempre devuelve un objetivo válido y `decideGhost` usa fallback antes de calcular distancias. |
+| Fantasma liberado puede quedar en bucle en la puerta si al llegar a las celdas de puerta (`y=12`, `x=13|14`) cambia a su objetivo normal antes de cruzar a la salida | `ghostTarget` mantiene `PEN_EXIT` mientras el fantasma esté en el corral o en la ruta de salida (`inExitPath`: interior del corral o celdas de puerta), hasta alcanzar la casilla de salida. |
 
 ## Lo que **no** está en esta spec
 

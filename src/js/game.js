@@ -60,7 +60,7 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
-      releaseAt: RELEASE_DELAY[ g.kind ],
+      releaseAt: RELEASE_DELAY[ g.kind ] ?? 0,
     } ) ),
   };
 }
@@ -105,6 +105,12 @@ function inPen( g ) {
   return x >= PEN_RECT.x1 && x <= PEN_RECT.x2 && y >= PEN_RECT.y1 && y <= PEN_RECT.y2;
 }
 
+function inExitPath( g ) {
+  const x = Math.round( g.x );
+  const y = Math.round( g.y );
+  return inPen( g ) || ( y === 12 && ( x === 13 || x === 14 ) );
+}
+
 function manhattan( ax, ay, bx, by ) {
   return Math.abs( ax - bx ) + Math.abs( ay - by );
 }
@@ -143,9 +149,14 @@ function chaseTarget( game, g ) {
 }
 
 function ghostTarget( game, g ) {
-  if ( inPen( g ) ) return PEN_EXIT;
-  if ( game.mode === 'scatter' ) return SCATTER_CORNERS[ g.kind ];
-  return chaseTarget( game, g );
+  if ( inExitPath( g ) ) return PEN_EXIT;
+  const px = Math.round( game.pacman.x );
+  const py = Math.round( game.pacman.y );
+  const fallback = { x: px, y: py };
+  if ( game.mode === 'scatter' ) {
+    return SCATTER_CORNERS[ g.kind ] || SCATTER_CORNERS.blinky || fallback;
+  }
+  return chaseTarget( game, g ) || fallback;
 }
 
 function movePacman( game ) {
@@ -180,7 +191,9 @@ function movePacman( game ) {
 
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const target = ghostTarget( game, g );
+  const px = Math.round( game.pacman.x );
+  const py = Math.round( game.pacman.y );
+  const target = ghostTarget( game, g ) || { x: px, y: py };
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
@@ -238,7 +251,7 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
-    g.releaseAt = RELEASE_DELAY[ g.kind ];
+    g.releaseAt = RELEASE_DELAY[ g.kind ] ?? 0;
   } );
 }
 
