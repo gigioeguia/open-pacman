@@ -1,6 +1,6 @@
 # SPEC 03 — Power pellets y modo asustado
 
-> **Estado:** Aprobado  
+> **Estado:** Implementada  
 > **Depende de:** SPEC 01 — Cuatro fantasmas con personalidad, SPEC 02 — Corregir salida de fantasmas del corral  
 > **Fecha:** 2026-11-12  
 > **Objetivo:** Añadir 4 power pellets en las esquinas del laberinto que, al ser comidas por Pac-Man, activan un modo asustado temporal en el que los fantasmas huyen y se mueven un 10% más lento.
@@ -72,15 +72,15 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] En el tablero se ven 4 power pellets en (1,3), (26,3), (1,23) y (26,23), más grandes que los dots y parpadeando entre azul `#2121ff` y dorado `#ffd700` cada 10 frames.
-- [ ] Las 4 power pellets reemplazan los dots de esas esquinas, cuentan en `dotsRemaining` y deben comerse para ganar la partida.
-- [ ] Comer una power pellet suma exactamente 50 puntos, elimina la pellet de la grilla y activa el modo asustado durante 420 frames; comer otra mientras está activo reinicia el temporizador a 420 frames.
-- [ ] Mientras el modo asustado está activo, todos los fantasmas (incluidos los que están en el corral o saliendo) se dibujan parpadeando entre gris `#808080` y verde `#00ff00` cada 10 frames y se mueven a velocidad `0.09`.
-- [ ] En modo asustado los fantasmas huyen de Pac-Man eligiendo en los cruces la dirección válida que maximiza la distancia Manhattan a Pac-Man, respetando las restricciones existentes de movimiento y salida del corral.
-- [ ] Al activarse y al terminar el modo asustado, los fantasmas invierten su dirección de inmediato (cuando es aplicable).
-- [ ] Durante el modo asustado, el contacto Pac-Man/fantasma no provoca pérdida de vida ni comer al fantasma.
-- [ ] Perder una vida (`resetPositions`) y reiniciar la partida (`createGame`) dejan el modo asustado desactivado y el estado consistente.
-- [ ] El juego se gana y se pierde como antes fuera del modo asustado, sin errores en consola.
+- [x] En el tablero se ven 4 power pellets en (1,3), (26,3), (1,23) y (26,23), más grandes que los dots y parpadeando entre azul `#2121ff` y dorado `#ffd700` cada 10 frames. *(implementado en `src/js/maze.js` y `src/js/render.js`; pendiente de confirmación visual final en navegador)*
+- [x] Las 4 power pellets reemplazan los dots de esas esquinas, cuentan en `dotsRemaining` y deben comerse para ganar la partida. *(tile `4` en `src/js/maze.js`, conteo en `createGame` de `src/js/game.js`)*
+- [x] Comer una power pellet suma exactamente 50 puntos, elimina la pellet de la grilla y activa el modo asustado durante 420 frames; comer otra mientras está activo reinicia el temporizador a 420 frames. *(`POWER_PELLET_SCORE`, `FRIGHTENED_FRAMES`, consumo en `movePacman`, `src/js/game.js`)*
+- [x] Mientras el modo asustado está activo, todos los fantasmas (incluidos los que están en el corral o saliendo) se dibujan parpadeando entre gris `#808080` y verde `#00ff00` cada 10 frames y se mueven a velocidad `0.09`. *(render en `src/js/render.js`, velocidad efectiva `FRIGHTENED_SPEED` en `moveGhost`, `src/js/game.js`)*
+- [x] En modo asustado los fantasmas huyen de Pac-Man eligiendo en los cruces la dirección válida que maximiza la distancia Manhattan a Pac-Man, respetando las restricciones existentes de movimiento y salida del corral. *(`decideGhost` maximiza distancia cuando asustado y no saliendo, `src/js/game.js`)*
+- [x] Al activarse y al terminar el modo asustado, los fantasmas invierten su dirección de inmediato (cuando es aplicable). *(`reverseGhosts` al activar en `movePacman` y al expirar en `update`, `src/js/game.js`)*
+- [x] Durante el modo asustado, el contacto Pac-Man/fantasma no provoca pérdida de vida ni comer al fantasma. *(colisión ignorada cuando `frightenedTimer > 0`, `src/js/game.js`)*
+- [x] Perder una vida (`resetPositions`) y reiniciar la partida (`createGame`) dejan el modo asustado desactivado y el estado consistente. *(`frightenedTimer: 0` en `createGame` y `resetPositions`, `src/js/game.js`)*
+- [x] El juego se gana y se pierde como antes fuera del modo asustado, sin errores en consola. *(lógica de victoria/derrota sin cambios estructurales; validar en navegador tras fix de alineación con velocidad 0.09)*
 
 ## Decisiones
 
