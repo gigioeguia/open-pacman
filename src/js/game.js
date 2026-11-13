@@ -18,6 +18,10 @@ const FRIGHTENED_FRAMES = 420;   // ~7 s a 60 fps
 const FRIGHTENED_SPEED = 0.09;   // 10% menos que GHOST_SPEED (0.1)
 const POWER_PELLET_TILE = 4;
 
+const GHOST_EAT_SCORES = [ 200, 400, 800, 1600 ];
+const EYES_SPEED = 0.2;        // 2x GHOST_SPEED, incluye tramo dentro del corral
+const GHOST_SCORE_POPUP_FRAMES = 60;
+
 const RELEASE_DELAY = { blinky: 0, pinky: 120, inky: 360, clyde: 600 }; // frames
 const SCATTER_CORNERS = {
   blinky: { x: 26, y: 1 },
@@ -53,6 +57,8 @@ function createGame() {
     modeIndex: 0,
     modeFrames: 0,
     frightenedTimer: 0,
+    frightenedEatenCount: 0,
+    ghostScorePopups: [],
     pacman: {
       x: PACMAN_START.x,
       y: PACMAN_START.y,
@@ -67,6 +73,7 @@ function createGame() {
       speed: GHOST_SPEED,
       kind: g.kind,
       releaseAt: RELEASE_DELAY[ g.kind ] ?? 0,
+      eyes: false,
     } ) ),
   };
 }
@@ -158,7 +165,18 @@ function chaseTarget( game, g ) {
   return { x: px, y: py };
 }
 
+function ghostHome( g ) {
+  return GHOST_STARTS.find( ( s ) => s.kind === g.kind ) || GHOST_STARTS[ 0 ];
+}
+
 function ghostTarget( game, g ) {
+  if ( g.eyes ) {
+    const home = ghostHome( g );
+    const gx = Math.round( g.x );
+    const gy = Math.round( g.y );
+    if ( gx === PEN_EXIT.x && gy <= PEN_EXIT.y ) return home;
+    return PEN_EXIT;
+  }
   if ( isExiting( g ) ) return PEN_EXIT;
   const px = Math.round( game.pacman.x );
   const py = Math.round( game.pacman.y );
@@ -194,6 +212,7 @@ function movePacman( game ) {
       game.score += POWER_PELLET_SCORE;
       game.dotsRemaining--;
       game.frightenedTimer = FRIGHTENED_FRAMES;
+      game.frightenedEatenCount = 0;
       reverseGhosts( game );
     }
     // Si no puede seguir, se detiene en la celda.
@@ -221,7 +240,7 @@ function decideGhost( game, g ) {
   const px = Math.round( game.pacman.x );
   const py = Math.round( game.pacman.y );
   const exiting = isExiting( g );
-  const frightened = game.frightenedTimer > 0 && !exiting;
+  const frightened = game.frightenedTimer > 0 && !exiting && !g.eyes;
   const target = ghostTarget( game, g ) || { x: px, y: py };
 
   const options = Object.keys( DIRS ).filter(
@@ -231,7 +250,7 @@ function decideGhost( game, g ) {
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
   // En celdas de puerta, prioriza subir para cruzar al mapa sin bucles.
-  if ( exiting && Math.round( g.y ) === 12 && choices.includes( 'up' ) ) {
+  if ( exiting && !g.eyes && Math.round( g.y ) === 12 && choices.includes( 'up' ) ) {
     g.dir = 'up';
     return;
   }
@@ -250,7 +269,7 @@ function decideGhost( game, g ) {
   }
 
   // Durante la salida, ante empate de distancia prefiere avanzar hacia arriba/centro.
-  if ( exiting ) {
+  if ( exiting && !g.eyes ) {
     const pref = [ 'up', 'left', 'right', 'down' ];
     for ( const dir of pref ) {
       if ( !choices.includes( dir ) ) continue;
@@ -269,7 +288,7 @@ function decideGhost( game, g ) {
 }
 
 function moveGhost( game, g ) {
-  if ( game.time < g.releaseAt ) return;
+  if ( !g.eyes && game.time < g.releaseAt ) return;
 
   const grid = game.grid;
   const width = grid[ 0 ].length;
@@ -277,14 +296,24 @@ function moveGhost( game, g ) {
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
+
+    if ( g.eyes ) {
+      const home = ghostHome( g );
+      if ( g.x === home.x && g.y === home.y ) {
+        g.eyes = false;
+        g.dir = 'up';
+        g.releaseAt = 0;
+      }
+    }
+
     // Normaliza estado en celdas alineadas durante la salida.
-    if ( isExiting( g ) && !DIRS[ g.dir ] ) g.dir = 'up';
+    if ( isExiting( g ) && !g.eyes && !DIRS[ g.dir ] ) g.dir = 'up';
     decideGhost( game, g );
     if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
   }
 
   const d = DIRS[ g.dir ];
-  const speed = game.frightenedTimer > 0 ? FRIGHTENED_SPEED : g.speed;
+  const speed = g.eyes ? EYES_SPEED : ( game.frightenedTimer > 0 ? FRIGHTENED_SPEED : g.speed );
   const nx = g.x + d.x * speed;
   const ny = g.y + d.y * speed;
 
@@ -303,6 +332,7 @@ function moveGhost( game, g ) {
 function reverseGhosts( game ) {
   const grid = game.grid;
   game.ghosts.forEach( ( g ) => {
+    if ( g.eyes ) return;
     const rev = OPPOSITE[ g.dir ];
     if ( !rev ) return;
     const x = aligned( g.x ) ? Math.round( g.x ) : Math.round( g.x );
@@ -323,12 +353,15 @@ function resetPositions( game ) {
   game.modeIndex = 0;
   game.modeFrames = 0;
   game.frightenedTimer = 0;
+  game.frightenedEatenCount = 0;
+  game.ghostScorePopups = [];
 
   game.ghosts.forEach( ( g, i ) => {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
     g.releaseAt = RELEASE_DELAY[ g.kind ] ?? 0;
+    g.eyes = false;
   } );
 }
 
@@ -354,20 +387,34 @@ function update( game ) {
     if ( game.frightenedTimer === 0 ) reverseGhosts( game );
   }
 
+  for ( let i = game.ghostScorePopups.length - 1; i >= 0; i-- ) {
+    game.ghostScorePopups[ i ].timer--;
+    if ( game.ghostScorePopups[ i ].timer <= 0 ) game.ghostScorePopups.splice( i, 1 );
+  }
+
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
   for ( const g of game.ghosts ) {
-    if ( collides( game.pacman, g ) ) {
-      if ( game.frightenedTimer > 0 ) continue;
-      game.lives--;
-      if ( game.lives <= 0 ) {
-        game.state = 'lost';
-        return;
-      }
-      resetPositions( game );
-      break;
+    if ( !collides( game.pacman, g ) ) continue;
+    if ( g.eyes ) continue;
+    if ( game.frightenedTimer > 0 ) {
+      if ( isExiting( g ) ) continue;
+      const idx = Math.min( game.frightenedEatenCount, GHOST_EAT_SCORES.length - 1 );
+      const score = GHOST_EAT_SCORES[ idx ];
+      game.frightenedEatenCount++;
+      game.score += score;
+      g.eyes = true;
+      game.ghostScorePopups.push( { x: g.x, y: g.y, score, timer: GHOST_SCORE_POPUP_FRAMES } );
+      continue;
     }
+    game.lives--;
+    if ( game.lives <= 0 ) {
+      game.state = 'lost';
+      return;
+    }
+    resetPositions( game );
+    break;
   }
 
   if ( game.dotsRemaining <= 0 ) game.state = 'won';

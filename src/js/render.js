@@ -108,38 +108,41 @@ function drawPacman( ctx, p, frame ) {
 
 function drawGhost( ctx, game, g, color, frame ) {
   let { cx, cy } = cellCenter( g.x, g.y );
-  if ( game.time < g.releaseAt ) {
+  if ( !g.eyes && game.time < g.releaseAt ) {
     cy += Math.sin( frame * 0.15 ) * 3;
   }
-  const r = TILE / 2 - 1;
-  const top = cy - r;
-  const bottom = cy + r;
-  const left = cx - r;
-  const right = cx + r;
-
-  const frightened = game.frightenedTimer > 0;
-  const bodyColor = frightened
-    ? FRIGHTENED_GHOST_COLORS[
-      Math.floor( frame / GHOST_FRIGHTENED_BLINK_FRAMES ) % FRIGHTENED_GHOST_COLORS.length
-    ]
-    : color;
-
-  ctx.fillStyle = bodyColor;
-  ctx.beginPath();
-  ctx.arc( cx, cy - 1, r, Math.PI, 0, false ); // cabeza
-  ctx.lineTo( right, bottom );
-  // falda ondulada (3 picos)
-  ctx.lineTo( right - r * 0.66, bottom - 4 );
-  ctx.lineTo( cx, bottom );
-  ctx.lineTo( left + r * 0.66, bottom - 4 );
-  ctx.lineTo( left, bottom );
-  ctx.closePath();
-  ctx.fill();
 
   // ojos mirando segun direccion
   const dir = DIRS[ g.dir ] || { x: 0, y: 0 };
   const ex = dir.x * 1.6;
   const ey = dir.y * 1.6;
+
+  if ( !g.eyes ) {
+    const r = TILE / 2 - 1;
+    const bottom = cy + r;
+    const left = cx - r;
+    const right = cx + r;
+
+    const frightened = game.frightenedTimer > 0;
+    const bodyColor = frightened
+      ? FRIGHTENED_GHOST_COLORS[
+        Math.floor( frame / GHOST_FRIGHTENED_BLINK_FRAMES ) % FRIGHTENED_GHOST_COLORS.length
+      ]
+      : color;
+
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.arc( cx, cy - 1, r, Math.PI, 0, false ); // cabeza
+    ctx.lineTo( right, bottom );
+    // falda ondulada (3 picos)
+    ctx.lineTo( right - r * 0.66, bottom - 4 );
+    ctx.lineTo( cx, bottom );
+    ctx.lineTo( left + r * 0.66, bottom - 4 );
+    ctx.lineTo( left, bottom );
+    ctx.closePath();
+    ctx.fill();
+  }
+
   for ( const off of [ -3.5, 3.5 ] ) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
@@ -149,6 +152,18 @@ function drawGhost( ctx, game, g, color, frame ) {
     ctx.beginPath();
     ctx.arc( cx + off + ex, cy - 1 + ey, 1.5, 0, Math.PI * 2 );
     ctx.fill();
+  }
+}
+
+function drawGhostScorePopups( ctx, game ) {
+  const popups = game.ghostScorePopups || [];
+  ctx.fillStyle = '#00ffff';
+  ctx.font = '12px "Courier New", monospace';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  for ( const p of popups ) {
+    const { cx, cy } = cellCenter( p.x, p.y );
+    ctx.fillText( '' + p.score, cx, cy - 2 );
   }
 }
 
@@ -182,6 +197,7 @@ function draw( ctx, game, frame ) {
   drawDots( ctx, grid, frame );
   drawPacman( ctx, game.pacman, frame );
   game.ghosts.forEach( ( g ) => drawGhost( ctx, game, g, GHOST_COLORS[ g.kind ] || '#ff0000', frame ) );
+  drawGhostScorePopups( ctx, game );
   drawHUD( ctx, game, W );
 }
 
