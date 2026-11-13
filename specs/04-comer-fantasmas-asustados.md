@@ -1,6 +1,6 @@
 # SPEC 04 — Comer fantasmas asustados y retorno al corral
 
-> **Estado:** Aprovada  
+> **Estado:** Implementado  
 > **Depende de:** SPEC 03 — Power pellets y modo asustado  
 > **Fecha:** 2026-11-12  
 > **Objetivo:** Permitir que Pac-Man coma fantasmas durante el modo asustado, otorgando puntuación progresiva, mostrando el puntaje y haciendo que los fantasmas regresen como ojos al corral para reaparecer y reintegrarse al juego.
@@ -76,15 +76,15 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] En modo asustado activo, Pac-Man puede comer un fantasma comible (no en ojos y no saliendo/dentro del corral) al colisionar, sin perder vida.
-- [ ] Los puntos otorgados por fantasmas comidos en un mismo periodo de asustado son 200, 400, 800 y 1600 en secuencia; al comer una nueva power pellet la secuencia se reinicia y el asustado se reinicia según SPEC 03.
-- [ ] Al comer un fantasma se muestra su puntaje (200/400/800/1600) en la posición del fantasma durante 60 frames (~1 s) y el juego continúa sin pausa.
-- [ ] Un fantasma comido pasa a modo ojos, no es peligroso, no puede volver a comerse y deja de comportarse como fantasma asustado/normal mientras retorna.
-- [ ] El fantasma en ojos regresa por pathfinding a `PEN_EXIT` (13,11) y luego a su `GHOST_STARTS` de `kind` a velocidad `0.2` celdas/frame (incluido dentro del corral), sin teletransporte.
-- [ ] Al llegar a su casilla inicial, el fantasma reaparece inmediatamente, sale de inmediato hacia `PEN_EXIT`/mapa con la lógica de salida existente (sin nuevo retardo de liberación) y se reintegra al juego.
-- [ ] El `frightenedTimer` global y el ciclo scatter/chase global se mantienen coherentes; la expiración del asustado no interrumpe el retorno de ojos.
-- [ ] `createGame` y `resetPositions` dejan sin ojos activos, sin popups y con contadores de comida en asustado reiniciados.
-- [ ] El juego se gana y se pierde como antes, sin errores en consola.
+- [x] En modo asustado activo, Pac-Man puede comer un fantasma comible (no en ojos y no saliendo/dentro del corral) al colisionar, sin perder vida.
+- [x] Los puntos otorgados por fantasmas comidos en un mismo periodo de asustado son 200, 400, 800 y 1600 en secuencia; al comer una nueva power pellet la secuencia se reinicia y el asustado se reinicia según SPEC 03.
+- [x] Al comer un fantasma se muestra su puntaje (200/400/800/1600) en la posición del fantasma durante 60 frames (~1 s) y el juego continúa sin pausa.
+- [x] Un fantasma comido pasa a modo ojos, no es peligroso, no puede volver a comerse y deja de comportarse como fantasma asustado/normal mientras retorna.
+- [x] El fantasma en ojos regresa por pathfinding a `PEN_EXIT` (13,11) y luego a su `GHOST_STARTS` de `kind` a velocidad `0.2` celdas/frame (incluido dentro del corral), sin teletransporte.
+- [x] Al llegar a su casilla inicial, el fantasma reaparece inmediatamente, sale de inmediato hacia `PEN_EXIT`/mapa con la lógica de salida existente (sin nuevo retardo de liberación) y se reintegra al juego.
+- [x] El `frightenedTimer` global y el ciclo scatter/chase global se mantienen coherentes; la expiración del asustado no interrumpe el retorno de ojos.
+- [x] `createGame` y `resetPositions` dejan sin ojos activos, sin popups y con contadores de comida en asustado reiniciados.
+- [x] El juego se gana y se pierde como antes, sin errores en consola.
 
 ## Decisiones
 
