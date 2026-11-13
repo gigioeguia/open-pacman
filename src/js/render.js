@@ -5,6 +5,10 @@ const TILE = 20;
 const WALL_COLOR = '#2121ff';
 const DOOR_COLOR = '#ffb8ff';
 const DOT_COLOR = '#ffb897';
+const POWER_PELLET_COLORS = [ '#2121ff', '#ffd700' ];
+const POWER_PELLET_BLINK_FRAMES = 10;
+const FRIGHTENED_GHOST_COLORS = [ '#808080', '#00ff00' ];
+const GHOST_FRIGHTENED_BLINK_FRAMES = 10;
 
 function cellCenter( x, y ) {
   return { cx: x * TILE + TILE / 2, cy: y * TILE + TILE / 2 };
@@ -66,14 +70,18 @@ function drawDoor( ctx, grid ) {
   ctx.stroke();
 }
 
-function drawDots( ctx, grid ) {
-  ctx.fillStyle = DOT_COLOR;
+function drawDots( ctx, grid, frame ) {
+  const pelletColor = POWER_PELLET_COLORS[
+    Math.floor( frame / POWER_PELLET_BLINK_FRAMES ) % POWER_PELLET_COLORS.length
+  ];
   for ( let y = 0; y < grid.length; y++ ) {
     for ( let x = 0; x < grid[ 0 ].length; x++ ) {
-      if ( grid[ y ][ x ] !== 2 ) continue;
+      const v = grid[ y ][ x ];
+      if ( v !== 2 && v !== 4 ) continue;
       const { cx, cy } = cellCenter( x, y );
+      ctx.fillStyle = v === 4 ? pelletColor : DOT_COLOR;
       ctx.beginPath();
-      ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      ctx.arc( cx, cy, v === 4 ? 6 : 2.5, 0, Math.PI * 2 );
       ctx.fill();
     }
   }
@@ -109,7 +117,14 @@ function drawGhost( ctx, game, g, color, frame ) {
   const left = cx - r;
   const right = cx + r;
 
-  ctx.fillStyle = color;
+  const frightened = game.frightenedTimer > 0;
+  const bodyColor = frightened
+    ? FRIGHTENED_GHOST_COLORS[
+      Math.floor( frame / GHOST_FRIGHTENED_BLINK_FRAMES ) % FRIGHTENED_GHOST_COLORS.length
+    ]
+    : color;
+
+  ctx.fillStyle = bodyColor;
   ctx.beginPath();
   ctx.arc( cx, cy - 1, r, Math.PI, 0, false ); // cabeza
   ctx.lineTo( right, bottom );
@@ -164,7 +179,7 @@ function draw( ctx, game, frame ) {
 
   drawWalls( ctx, grid );
   drawDoor( ctx, grid );
-  drawDots( ctx, grid );
+  drawDots( ctx, grid, frame );
   drawPacman( ctx, game.pacman, frame );
   game.ghosts.forEach( ( g ) => drawGhost( ctx, game, g, GHOST_COLORS[ g.kind ] || '#ff0000', frame ) );
   drawHUD( ctx, game, W );
