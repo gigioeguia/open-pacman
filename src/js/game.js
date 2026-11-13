@@ -13,6 +13,20 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 
+const RELEASE_DELAY = { blinky: 0, pinky: 120, inky: 360, clyde: 600 }; // frames
+const SCATTER_CORNERS = {
+  blinky: { x: 26, y: 1 },
+  pinky:  { x: 1,  y: 1 },
+  inky:   { x: 26, y: 29 },
+  clyde:  { x: 1,  y: 29 },
+};
+const MODE_CYCLE = [
+  { mode: 'scatter', frames: 420 },
+  { mode: 'chase',   frames: 1200 },
+];
+const PEN_EXIT = { x: 13, y: 11 };                    // casilla sobre la puerta
+const PEN_RECT = { x1: 11, x2: 16, y1: 13, y2: 15 };  // interior del corral
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -29,6 +43,10 @@ function createGame() {
     lives: 3,
     dotsRemaining: dots,
     grid,
+    time: 0,
+    mode: 'scatter',
+    modeIndex: 0,
+    modeFrames: 0,
     pacman: {
       x: PACMAN_START.x,
       y: PACMAN_START.y,
@@ -42,6 +60,7 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
+      releaseAt: RELEASE_DELAY[ g.kind ],
     } ) ),
   };
 }
@@ -80,6 +99,55 @@ function wrapTunnel( a, width ) {
   }
 }
 
+function inPen( g ) {
+  const x = Math.round( g.x );
+  const y = Math.round( g.y );
+  return x >= PEN_RECT.x1 && x <= PEN_RECT.x2 && y >= PEN_RECT.y1 && y <= PEN_RECT.y2;
+}
+
+function manhattan( ax, ay, bx, by ) {
+  return Math.abs( ax - bx ) + Math.abs( ay - by );
+}
+
+function chaseTarget( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  const pd = DIRS[ p.dir ] || DIRS.left;
+
+  if ( g.kind === 'blinky' ) {
+    return { x: px, y: py };
+  }
+
+  if ( g.kind === 'pinky' ) {
+    return { x: px + pd.x * 4, y: py + pd.y * 4 };
+  }
+
+  if ( g.kind === 'inky' ) {
+    const pivotX = px + pd.x * 2;
+    const pivotY = py + pd.y * 2;
+    const blinky = game.ghosts[ 0 ];
+    const bx = Math.round( blinky.x );
+    const by = Math.round( blinky.y );
+    return { x: pivotX + ( pivotX - bx ), y: pivotY + ( pivotY - by ) };
+  }
+
+  if ( g.kind === 'clyde' ) {
+    const gx = Math.round( g.x );
+    const gy = Math.round( g.y );
+    if ( manhattan( gx, gy, px, py ) > 8 ) return { x: px, y: py };
+    return SCATTER_CORNERS.clyde;
+  }
+
+  return { x: px, y: py };
+}
+
+function ghostTarget( game, g ) {
+  if ( inPen( g ) ) return PEN_EXIT;
+  if ( game.mode === 'scatter' ) return SCATTER_CORNERS[ g.kind ];
+  return chaseTarget( game, g );
+}
+
 function movePacman( game ) {
   const p = game.pacman;
   const grid = game.grid;
@@ -112,7 +180,7 @@ function movePacman( game ) {
 
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const p = game.pacman;
+  const target = ghostTarget( game, g );
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
@@ -120,28 +188,24 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
-    let best = choices[ 0 ];
-    let bestDist = Infinity;
-    for ( const dir of choices ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
-      if ( dist < bestDist ) {
-        bestDist = dist;
-        best = dir;
-      }
+  let best = choices[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of choices ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dist = manhattan( nx, ny, target.x, target.y );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
     }
-    g.dir = best;
-  } else {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
   }
+  g.dir = best;
 }
 
 function moveGhost( game, g ) {
+  if ( game.time < g.releaseAt ) return;
+
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
@@ -164,10 +228,17 @@ function resetPositions( game ) {
   p.y = PACMAN_START.y;
   p.dir = 'left';
   p.nextDir = null;
+
+  game.time = 0;
+  game.mode = 'scatter';
+  game.modeIndex = 0;
+  game.modeFrames = 0;
+
   game.ghosts.forEach( ( g, i ) => {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    g.releaseAt = RELEASE_DELAY[ g.kind ];
   } );
 }
 
@@ -175,7 +246,20 @@ function collides( a, b ) {
   return Math.abs( a.x - b.x ) < 0.5 && Math.abs( a.y - b.y ) < 0.5;
 }
 
+function updateMode( game ) {
+  game.modeFrames++;
+  const current = MODE_CYCLE[ game.modeIndex ];
+  if ( game.modeFrames >= current.frames ) {
+    game.modeFrames = 0;
+    game.modeIndex = ( game.modeIndex + 1 ) % MODE_CYCLE.length;
+    game.mode = MODE_CYCLE[ game.modeIndex ].mode;
+  }
+}
+
 function update( game ) {
+  game.time++;
+  updateMode( game );
+
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
